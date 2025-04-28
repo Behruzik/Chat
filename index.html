@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bubbles Chat</title>
+  <style>
+    * {margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+    body {
+      background: linear-gradient(135deg, #1e1e2f, #2c2c3f);
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background 0.3s;
+    }
+    .chat-container, .auth-container {
+      background: #2b2b3c;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 5px;
+      max-height: 70vh;
+    }
+    .message {
+      background: #444;
+      padding: 10px 15px;
+      border-radius: 20px;
+      max-width: 75%;
+      word-wrap: break-word;
+      animation: pop 0.3s ease-in-out;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .message.you {
+      align-self: flex-end;
+      background: #0078ff;
+    }
+    .message .delete-btn {
+      margin-left: 10px;
+      font-size: 14px;
+      color: red;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: none;
+    }
+    .chat-input {
+      display: flex;
+      gap: 10px;
+    }
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+    }
+    .chat-input button {
+      background: #00c6ff;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 15px;
+      cursor: pointer;
+    }
+    .theme-toggle {
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+    }
+    .file-upload-section input {
+      display: none;
+    }
+    .file-upload-section button {
+      background-color: #ff4081;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .message-alert {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0078ff;
+      padding: 10px;
+      border-radius: 10px;
+      animation: showAlert 3s ease-in-out;
+    }
+    .emoji-picker {
+      display: grid;
+      grid-template-columns: repeat(6, 30px);
+      gap: 5px;
+      margin-top: 10px;
+      display: none; 
+    }
+    .emoji-picker button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.7); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes showAlert {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container" id="authContainer">
+    <h2>🔐 Вход или регистрация</h2>
+    <input type="text" id="usernameInput" placeholder="Имя пользователя">
+    <input type="password" id="passwordInput" placeholder="Пароль">
+    <button onclick="login()">Войти</button>
+  </div>
+
+  <div class="chat-container" id="chatContainer">
+    <div id="greeting"></div>
+    <div class="messages" id="messages"></div>
+    <div class="chat-input">
+      <input type="text" id="msgInput" placeholder="Напиши сообщение..."/>
+      <button onclick="sendMessage()">Отправить</button>
+      <button onclick="toggleEmojiPicker()">😊</button>
+    </div>
+    <div class="emoji-picker" id="emojiPicker">
+      <button onclick="addEmoji('😊')">😊</button>
+      <button onclick="addEmoji('😂')">😂</button>
+      <button onclick="addEmoji('❤️')">❤️</button>
+      <button onclick="addEmoji('😎')">😎</button>
+      <button onclick="addEmoji('🔥')">🔥</button>
+      <button onclick="addEmoji('🙏')">🙏</button>
+      <button onclick="addEmoji('😜')">😜</button>
+      <button onclick="addEmoji('🥳')">🥳</button>
+      <button onclick="addEmoji('💡')">💡</button>
+      <button onclick="addEmoji('😢')">😢</button>
+      <button onclick="addEmoji('😱')">😱</button>
+      <button onclick="addEmoji('🎉')">🎉</button>
+    </div>
+    <div class="file-upload-section">
+      <input type="file" id="fileInput" onchange="uploadFile()">
+      <button onclick="triggerFileUpload()">📎 Загрузить файл</button>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">Сменить тему</button>
+  </div>
+
+  <div id="messageAlert" class="message-alert" style="display:none;">
+    💡 Чтобы получить "VIP" надо написать /promo Kukuruzik
+  </div>
+
+  <script>
+    // Инициализация переменных и элементов
+    const authContainer = document.getElementById('authContainer');
+    const chatContainer = document.getElementById('chatContainer');
+    const usernameInput = document.getElementById('usernameInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const greeting = document.getElementById('greeting');
+    const messagesDiv = document.getElementById('messages');
+    const msgInput = document.getElementById('msgInput');
+    const fileInput = document.getElementById('fileInput');
+    const messageAlert = document.getElementById('messageAlert');
+    const emojiPicker = document.getElementById('emojiPicker');
+    const themeToggleBtn = document.querySelector('.theme-toggle');
+
+    let isFirstMessage = true;
+    let isVIP = localStorage.getItem('isVIP') === 'true';
+    let isDarkTheme = localStorage.getItem('theme') !== 'light';
+    let username = localStorage.getItem('username');
+
+    // При загрузке страницы
+    window.onload = () => {
+      if (username) {
+        showChat();
+      } else {
+        authContainer.style.display = 'flex';
+      }
+      applyTheme();
+    };
+
+    // Логика для входа
+    function login() {
+      username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!username || !password) return alert('Введите имя и пароль.');
+      localStorage.setItem('username', username);
+      showChat();
+    }
+
+    // Показываем чат
+    function showChat() {
+      authContainer.style.display = 'none';
+      chatContainer.style.display = 'flex';
+      greeting.innerHTML = `👋 Привет, <strong>${username}</strong>!`;
+      restoreMessages();
+    }
+
+    // Отправка сообщения
+    function sendMessage() {
+      const text = msgInput.value.trim();
+      if (!text) return;
+
+      if (text.toLowerCase() === '/promo kukuruzik') {
+        isVIP = true;
+        localStorage.setItem('isVIP', 'true');
+        showVIPMessage("🎉 Поздравляем! Вы получили 👑 VIP статус.");
+        msgInput.value = '';
+        return;
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message you';
+      bubble.innerHTML = isVIP ? `<strong>👑 ${username}:</strong> ${text}` : `<strong>${username}:</strong> ${text}`;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = 'Удалить?';
+      deleteBtn.onclick = () => deleteMessage(bubble);
+      bubble.onclick = () => toggleDeleteButton(deleteBtn);
+      bubble.appendChild(deleteBtn);
+      messagesDiv.appendChild(bubble);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      saveMessage(bubble.outerHTML);
+
+      if (isFirstMessage) {
+        showAlert();
+        isFirstMessage = false;
+      }
+      msgInput.value = '';
+    }
+
+    // Показываем сообщение о VIP
+    function showVIPMessage(message) {
+      const vipMsg = document.createElement('div');
+      vipMsg.className = 'message';
+      vipMsg.style.background = '#ffd700';
+      vipMsg.innerHTML = `<strong>👑 VIP:</strong> ${message}`;
+      messagesDiv.appendChild(vipMsg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      saveMessage(vipMsg.outerHTML);
+    }
+
+    // Добавляем эмодзи
+    function addEmoji(emoji) {
+      msgInput.value += emoji;
+      emojiPicker.style.display = 'none';
+    }
+
+    // Переключаем отображение эмодзи
+    function toggleEmojiPicker() {
+      emojiPicker.style.display = emojiPicker.style.display === 'grid' ? 'none' : 'grid';
+    }
+
+    // Переключаем кнопку удаления
+    function toggleDeleteButton(deleteBtn) {
+      deleteBtn.style.display = deleteBtn.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // Удаляем сообщение
+    function deleteMessage(message) {
+      messagesDiv.removeChild(message);
+      saveAllMessages();
+    }
+
+    // Показываем системное сообщение
+    function showAlert() {
+      messageAlert.style.display = 'block';
+      setTimeout(() => {
+        messageAlert.style.display = 'none';
+      }, 3000);
+    }
+
+    // Триггер для загрузки файла
+    function triggerFileUpload() {
+      fileInput.click();
+    }
+
+    // Загрузка файла
+    function uploadFile() {
+      const file = fileInput.files[0];
+      if (file) {
+        let fileElement;
+        const fileURL = URL.createObjectURL(file);
+        if (file.type.startsWith('video/')) {
+          fileElement = document.createElement('video');
+          fileElement.src = fileURL;
+          fileElement.controls = true;
+          fileElement.style.maxWidth = '100%';
+          fileElement.style.borderRadius = '10px';
+        } else if (file.type.startsWith('image/')) {
+          fileElement = document.createElement('img');
+          fileElement.src = fileURL;
+          fileElement.style.maxWidth = '100%';
+          fileElement.style.borderRadius = '10px';
+        } else {
+          fileElement = document.createElement('a');
+          fileElement.href = fileURL;
+          fileElement.textContent = `📎 Скачать: ${file.name}`;
+          fileElement.style.color = '#00c6ff';
+          fileElement.style.textDecoration = 'none';
+          fileElement.target = '_blank';
+        }
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message you';
+        if (isVIP) {
+          bubble.innerHTML = `<strong>👑 ${username}:</strong><br/>`;
+        } else {
+          bubble.innerHTML = `<strong>${username}:</strong><br/>`;
+        }
+        bubble.appendChild(fileElement);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Удалить?';
+        deleteBtn.onclick = () => deleteMessage(bubble);
+        bubble.onclick = () => toggleDeleteButton(deleteBtn);
+        bubble.appendChild(deleteBtn);
+
+        messagesDiv.appendChild(bubble);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        saveMessage(bubble.outerHTML);
+      }
+    }
+
+    // Сохраняем сообщение
+    function saveMessage(html) {
+      let saved = JSON.parse(localStorage.getItem('messages')) || [];
+      saved.push(html);
+      localStorage.setItem('messages', JSON.stringify(saved));
+    }
+
+    // Восстанавливаем сообщения при входе
+    function restoreMessages() {
+      let saved = JSON.parse(localStorage.getItem('messages')) || [];
+      for (let html of saved) {
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        messagesDiv.appendChild(temp.firstChild);
+      }
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // Сохраняем все сообщения после удаления
+    function saveAllMessages() {
+      const allMessages = Array.from(messagesDiv.children).map(msg => msg.outerHTML);
+      localStorage.setItem('messages', JSON.stringify(allMessages));
+    }
+
+    // Смена темы
+    function toggleTheme() {
+      isDarkTheme = !isDarkTheme;
+      localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+      applyTheme();
+    }
+
+    // Применяем тему
+    function applyTheme() {
+      if (isDarkTheme) {
+        document.body.style.background = 'linear-gradient(135deg, #1e1e2f, #2c2c3f)';
+      } else {
+        document.body.style.background = 'linear-gradient(135deg, #f0f0f0, #d0d0d0)';
+        document.body.style.color = '#000';
+      }
+    }
+  </script>
+</body>
+</html>
